@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Mangabuff Helper</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="header">
+    <div class="status-header">
+      <div class="status-group">
+        <div class="status-item">
+          <span id="autoStatus" class="status-indicator"></span> <span>Прокрутка</span>
+        </div>
+        <div class="status-item">
+          <span id="farmStatus" class="status-indicator"></span> <span>Фарм</span>
+        </div>
+        <div class="status-item">
+          <span id="mineStatus" class="status-indicator"></span> <span>Шахта</span>
+        </div>
+      </div>
+    </div>
+    <div id="themeToggleContainer">
+      <label class="theme-switch">
+        <input type="checkbox" id="themeToggle">
+        <span class="slider"></span>
+      </label>
+      <span id="themeLabel">Тема</span>
+    </div>
+  </div>
+  <div id="header-sep"></div>
+  <div id="mainMenu">
+    <div class="button-group">
+      <button id="btnAuto" class="menu-button">Прокрутка</button>
+      <button id="btnFarm" class="menu-button">Фарм & Шахта</button>
+      <button id="btnFuture" class="menu-button" title="Комментирование при чтении">Комментирование</button>
+    </div>
+  </div>
+
+  <div id="autoPanel" class="section">
+    <button class="back-button" id="backAuto">← Назад</button>
+    <h2>Автопрокрутка</h2>
+    <div class="switch-group">
+      <label>
+        <input type="checkbox" id="autoScrollSwitch">
+        <span>Автопрокрутка</span>
+      </label>
+    </div>
+    <!-- ИСПРАВЛЕНО: Шаг изменен с 1 на 10 -->
+    <label>Скорость автопрокрутки: <span id="scrollSpeedLabel">50</span> px/с</label>
+    <input type="range" id="scrollSpeedRange" min="10" max="2000" step="10">
+    <label>Сколько глав читать (0=беск.):</label>
+    <input type="number" id="chapterLimitInput" min="0" max="10000" step="1" value="0">
+    <button id="resetChapters">Сбросить (и остановить прокрутку)</button>
+  </div>
+
+  <div id="farmPanel" class="section">
+    <button class="back-button" id="backFarm">← Назад</button>
+    <h2>Фарм и шахта</h2>
+
+    <div class="section-group">
+      <label><input type="checkbox" id="quizHighlightToggle"> Показать правильные ответы (квиз)</label>
+    </div>
+
+    <div class="control-card">
+      <h3 class="card-title">Фарм ивента</h3>
+      <p class="info-text">⚠️ Работает только на страницах глав</p>
+      <div class="section-group">
+        <label>Задержка перед кликом (подарки): <span id="giftDelayLabel">600</span> мс</label>
+        <input type="range" id="giftDelayRange" min="50" max="2000" step="25">
+        <input type="number" id="giftDelayInput" min="50" max="2000" step="25" style="width:90px; margin-top:6px;">
+      </div>
+      <div class="section-group">
+        <label>Фарм ивента:</label>
+        <div style="display:flex; gap:7px;">
+          <button id="startFarm">Запустить фарм</button>
+          <button id="stopFarm">Остановить</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="control-card">
+      <h3 class="card-title">Шахта</h3>
+      <div class="section-group">
+        <label>Скорость клика для шахты: <span id="mineDelayLabel">2.0</span> с (0.2 — 5.0)</label>
+        <input type="range" id="mineDelayRange" min="0.2" max="5" step="0.1">
+        <input type="number" id="mineDelayInput" min="0.2" max="5" step="0.1" style="width:90px; margin-top:6px;">
+      </div>
+      <div class="section-group">
+        <label>Фарм шахты:</label>
+        <div style="display:flex; gap:7px;">
+          <button id="startMine">Запустить шахту</button>
+          <button id="stopMine">Остановить</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="commentPanel" class="section">
+    <button class="back-button" id="backComment">← Назад</button>
+    <h2>Комментирование при чтении</h2>
+    <div class="section-group">
+      <label><input type="checkbox" id="autoCommentEnable"> Включить комментирование при чтении</label>
+    </div>
+    <div class="section-group">
+      <label>Раз в сколько глав (1-100):</label>
+      <input type="number" id="commentInterval" min="1" max="100" value="2" style="width:100px;">
+    </div>
+    <div class="section-group">
+      <label>Сколько всего комментариев (1-100):</label>
+      <input type="number" id="commentTotal" min="1" max="100" value="5" style="width:100px;">
+    </div>
+    <div class="section-group">
+      <label>Добавить комментарий в список:</label>
+      <input type="text" id="newCommentText" placeholder="Текст комментария" style="width:70%;">
+      <button id="addCommentBtn">Добавить</button>
+    </div>
+    <div class="control-card">
+      <h3 class="card-title">Список комментариев (рандомный выбор)</h3>
+      <div id="commentsCloud" style="max-height:160px; overflow:auto; padding:6px; border:1px solid #ddd; background:var(--container-bg)"></div>
+      <div style="margin-top:8px; display:flex; gap:8px;">
+        <button id="saveCommentsBtn">Сохранить</button>
+        <button id="clearCommentsBtn">Очистить список</button>
+      </div>
+      <div style="margin-top:8px;" class="small">Если прочитано недостаточно глав для оставки всех комментариев, при запуске будет показано предупреждение.</div>
+    </div>
+  </div>
+
+  <div id="errorBar" class="error-bar"></div>
+  <script src="popup.js"></script>
+</body>
+</html>
