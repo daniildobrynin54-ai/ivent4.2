@@ -1,15 +1,5 @@
-// content.js - Исправленная и оптимизированная версия
+// content.js - Улучшенная версия с плавной прокруткой и автозакрытием комментариев
 'use strict';
-
-/**
- * @fileoverview Главный контентный скрипт для автоматизации на mangabuff.ru
- * Функции: автопрокрутка, фарм подарков/шахты, автокомментирование
- * 
- * ИСПРАВЛЕНИЯ:
- * - Фарм ивента теперь работает ТОЛЬКО на страницах глав
- * - Улучшена синхронизация кликов и прокрутки
- * - Добавлена валидация типа страницы для всех функций
- */
 
 (() => {
   // ==================== КОНСТАНТЫ ====================
@@ -223,17 +213,14 @@
    * Находит элементы подарков на странице
    */
   function findGiftElements() {
-    // Приоритет: специфичные селекторы
     let elements = Array.from(document.querySelectorAll(CONFIG.SELECTORS.GIFT));
     if (elements.length) return elements;
 
-    // Fallback: атрибуты
     elements = Array.from(document.querySelectorAll(
       '[data-event*="gift"], [data-role*="gift"]'
     ));
     if (elements.length) return elements;
 
-    // Последний fallback: поиск по тексту
     return Array.from(document.querySelectorAll('button, a, div, span'))
       .filter(el => {
         const text = (
@@ -307,7 +294,6 @@
     try {
       const data = await chromeAsync.storage.get(STORAGE_KEYS);
 
-      // Обновление состояния
       state.autoScroll = Boolean(data.autoScroll);
       state.scrollSpeed = Math.max(Number(data.scrollSpeed) || 50, 1);
       state.chapterLimit = Math.max(Number(data.chapterLimit) || 0, 0);
@@ -317,7 +303,6 @@
       state.giftClickDelay = Math.max(Number(data.giftClickDelay) || CONFIG.DEFAULT_GIFT_DELAY, CONFIG.MIN_GIFT_DELAY);
       state.mineClickDelay = Math.max(Number(data.mineClickDelay) || CONFIG.DEFAULT_MINE_DELAY, CONFIG.MIN_MINE_DELAY);
 
-      // Автокомментирование
       if (data[CONFIG.AUTO_COMMENT_KEY]) {
         Object.assign(state.autoCommentSettings, data[CONFIG.AUTO_COMMENT_KEY]);
       }
@@ -350,7 +335,6 @@
       let x = x0 + dx * t;
       let y = y0 + dy * t;
 
-      // Добавление естественной кривизны
       const amplitude = Math.sin(Math.PI * t) * (
         CONFIG.MOUSE_CURVE_AMPLITUDE + 
         Math.random() * CONFIG.MOUSE_CURVE_VARIATION
@@ -373,11 +357,8 @@
     if (!element || state.clickedElements.has(element)) return;
     
     state.clickedElements.add(element);
-
-    // Устанавливаем флаг выполнения клика
     state.isPerformingClick = true;
 
-    // Останавливаем прокрутку если активна
     const wasScrolling = state.autoScroll;
     if (wasScrolling) {
       stopSmoothScroll();
@@ -385,7 +366,6 @@
 
     const baseDelay = Math.max(CONFIG.MIN_GIFT_DELAY, state.giftClickDelay);
     
-    // Фазы реакции человека
     const noticeDelay = Math.floor(baseDelay * (0.25 + Math.random() * 0.6));
     const realizeDelay = Math.floor(baseDelay * (0.4 + Math.random() * 0.8));
     const moveTime = Math.floor(baseDelay * (1.0 + Math.random() * 1.2));
@@ -394,10 +374,7 @@
     const steps = CONFIG.MOUSE_PATH_STEPS + Math.floor(Math.random() * CONFIG.MOUSE_EXTRA_STEPS);
 
     try {
-      // Фаза 1: Заметить элемент
       await wait(noticeDelay);
-      
-      // Фаза 2: Осознать и начать движение
       await wait(realizeDelay);
       
       if (!isVisible(element)) {
@@ -416,7 +393,6 @@
         Math.floor(moveTime / Math.max(1, steps))
       );
 
-      // Фаза 3: Двигать мышь по пути
       for (let i = 0; i < path.length; i++) {
         if (!isVisible(element)) {
           throw new Error('Element disappeared during movement');
@@ -433,7 +409,6 @@
         await wait(stepDelay);
       }
 
-      // Фаза 4: Кликнуть
       if (isVisible(element)) {
         element.dispatchEvent(new MouseEvent('click', {
           bubbles: true,
@@ -442,7 +417,6 @@
         logger.info('Клик выполнен:', element.className);
       }
 
-      // Фаза 5: Возобновить прокрутку после задержки
       await wait(resumeDelay);
       
     } catch (err) {
@@ -450,7 +424,6 @@
     } finally {
       state.isPerformingClick = false;
       
-      // Возобновляем прокрутку только если она была активна
       if (wasScrolling && !state.isPerformingClick) {
         startSmoothScroll();
         logger.info('Прокрутка возобновлена после клика');
@@ -468,8 +441,6 @@
     if (clickCount >= CONFIG.MAX_BAG_CLICKS) return;
 
     state.bagClickCounts.set(bag, clickCount + 1);
-
-    // Устанавливаем флаг
     state.isPerformingClick = true;
 
     const wasScrolling = state.autoScroll;
@@ -496,10 +467,10 @@
     }
   }
 
-  // ==================== АВТОПРОКРУТКА ====================
+  // ==================== АВТОПРОКРУТКА (УЛУЧШЕННАЯ) ====================
   
   /**
-   * Запускает плавную автопрокрутку
+   * Запускает плавную автопрокрутку с улучшенной производительностью
    */
   function startSmoothScroll() {
     if (!state.autoScroll || !isChapterPage() || state.isPerformingClick) {
@@ -507,9 +478,10 @@
     }
 
     state.lastRafTs = null;
+    let frameSkipCounter = 0;
+    const FRAME_SKIP_THRESHOLD = 2;
 
     function scrollLoop(timestamp) {
-      // Проверяем флаг перед каждым кадром
       if (!state.autoScroll || state.isPerformingClick) {
         safeCancelRAF(state.scrollRAF);
         state.scrollRAF = null;
@@ -519,12 +491,37 @@
       if (!state.lastRafTs) state.lastRafTs = timestamp;
       
       const deltaTime = timestamp - state.lastRafTs;
+      
+      // Защита от больших скачков времени
+      if (deltaTime > 100) {
+        state.lastRafTs = timestamp;
+        state.scrollRAF = requestAnimationFrame(scrollLoop);
+        return;
+      }
+      
       state.lastRafTs = timestamp;
 
-      const scrollDelta = Math.max(state.scrollSpeed * (deltaTime / 1000), 1);
-      window.scrollBy(0, scrollDelta);
+      // Пропуск кадров при высокой нагрузке
+      frameSkipCounter++;
+      if (frameSkipCounter < FRAME_SKIP_THRESHOLD) {
+        state.scrollRAF = requestAnimationFrame(scrollLoop);
+        return;
+      }
+      frameSkipCounter = 0;
 
-      // Проверка достижения конца страницы
+      // Плавная интерполяция
+      const targetScroll = state.scrollSpeed * (deltaTime / 1000);
+      const smoothScroll = targetScroll * 0.8;
+      const scrollDelta = Math.max(smoothScroll, 0.5);
+      
+      if (typeof requestIdleCallback === 'function') {
+        requestIdleCallback(() => {
+          window.scrollBy({ top: scrollDelta, behavior: 'auto' });
+        }, { timeout: 16 });
+      } else {
+        window.scrollBy({ top: scrollDelta, behavior: 'auto' });
+      }
+
       if (document.body && 
           window.innerHeight + window.scrollY >= 
           document.body.offsetHeight - CONFIG.SCROLL_BOTTOM_THRESHOLD) {
@@ -572,15 +569,12 @@
   
   /**
    * Выполняет один цикл фарма подарков и сумок
-   * ИСПРАВЛЕНО: Работает только на страницах глав
    */
   function farmOnce() {
-    // НОВАЯ ПРОВЕРКА: Фарм работает только на страницах глав
     if (!state.farmActive || state.isPerformingClick || !isChapterPage()) {
       return;
     }
 
-    // Клик по подаркам
     const gifts = findGiftElements();
     gifts.forEach(gift => {
       if (!state.clickedElements.has(gift) && isVisible(gift)) {
@@ -588,7 +582,6 @@
       }
     });
 
-    // Клик по сумкам
     const bags = findBagElements();
     bags.forEach(bag => {
       if (isVisible(bag)) {
@@ -629,7 +622,6 @@
     if (hitsLeft > 0) {
       clickMineButton();
     } else {
-      // Останавливаем, если удары закончились
       state.mineActive = false;
       
       if (state.mineInterval) {
@@ -641,7 +633,7 @@
     }
   }
 
-  // ==================== АВТОКОММЕНТИРОВАНИЕ ====================
+  // ==================== АВТОКОММЕНТИРОВАНИЕ (УЛУЧШЕННОЕ) ====================
   
   /**
    * Вычисляет необходимое количество глав для заданных параметров
@@ -651,11 +643,10 @@
   }
 
   /**
-   * Отправляет комментарий на странице главы
+   * Отправляет комментарий на странице главы (с автозакрытием окна)
    */
   async function postComment(text) {
     try {
-      // Поиск кнопки открытия комментариев
       const commentButtonSelectors = [
         'button.reader-menu__item.reader-menu__item--comment',
         'button.reader-menu__Item--comment',
@@ -677,7 +668,6 @@
         }
       }
 
-      // Fallback: поиск по тексту
       if (!commentButton) {
         await wait(50);
         commentButton = Array.from(document.querySelectorAll('button, a'))
@@ -686,7 +676,6 @@
           )) || null;
       }
 
-      // Последний fallback: ожидание появления
       if (!commentButton) {
         commentButton = await waitForSelector('button, a', CONFIG.COMMENT_FALLBACK_WAIT)
           .then(() => Array.from(document.querySelectorAll('button, a'))
@@ -706,7 +695,6 @@
 
       commentButton.click();
 
-      // Ожидание появления textarea
       const textarea = await waitForSelector(
         CONFIG.SELECTORS.COMMENT_TEXTAREA, 
         CONFIG.COMMENT_TEXTAREA_TIMEOUT
@@ -719,7 +707,6 @@
         return false;
       }
 
-      // Заполнение textarea
       textarea.focus();
       textarea.value = text;
       textarea.dispatchEvent(new Event('input', { bubbles: true }));
@@ -727,7 +714,6 @@
       
       await wait(300);
 
-      // Поиск кнопки отправки
       let sendButton = document.querySelector(CONFIG.SELECTORS.COMMENT_SEND);
       
       if (!sendButton) {
@@ -747,9 +733,47 @@
       sendButton.click();
       await wait(CONFIG.COMMENT_DELAY);
 
-      // Закрытие формы комментариев
-      const closeButton = document.querySelector(CONFIG.SELECTORS.COMMENT_CLOSE);
-      if (closeButton) closeButton.click();
+      // ==================== УЛУЧШЕННОЕ ЗАКРЫТИЕ ОКНА ====================
+      
+      const closeSelectors = [
+        CONFIG.SELECTORS.COMMENT_CLOSE,
+        '.comments__close-form-btn',
+        'button.comments__close-form-btn',
+        '.reader-comments__close',
+        'button.reader-comments__close',
+        '[data-role="close-comments"]',
+        'button[aria-label*="закрыт"]',
+        'button[aria-label*="close"]'
+      ];
+
+      let closeButton = null;
+      for (const selector of closeSelectors) {
+        closeButton = document.querySelector(selector);
+        if (closeButton) break;
+      }
+
+      if (!closeButton) {
+        const buttons = Array.from(document.querySelectorAll('button'));
+        closeButton = buttons.find(btn => {
+          const text = (btn.textContent || btn.innerText || '').toLowerCase();
+          return text.includes('отмена') || text.includes('закрыт') || 
+                 text.includes('cancel') || text.includes('close');
+        });
+      }
+
+      if (closeButton) {
+        closeButton.click();
+        logger.info('✅ Окно комментариев закрыто');
+      } else {
+        logger.warn('⚠️ Кнопка закрытия комментариев не найдена');
+        
+        // Попытка закрыть через ESC
+        document.dispatchEvent(new KeyboardEvent('keydown', { 
+          key: 'Escape', 
+          keyCode: 27,
+          bubbles: true 
+        }));
+      }
 
       await chromeAsync.storage.set({ lastAutoCommentError: '' });
       logger.info('Комментарий отправлен:', text);
@@ -769,7 +793,7 @@
   async function handleChapterRead(chapterIndex) {
     try {
       if (!state.autoCommentSettings?.enabled) return;
-      if (!chapterIndex || chapterIndex === 1) return; // Пропуск первой главы
+      if (!chapterIndex || chapterIndex === 1) return;
 
       const interval = Math.max(1, Number(state.autoCommentSettings.interval) || 1);
       const total = Math.max(1, Number(state.autoCommentSettings.totalComments) || 1);
@@ -777,7 +801,6 @@
       
       const offset = chapterIndex - 2;
 
-      // Проверка: нужно ли оставлять комментарий на этой главе
       if (offset >= 0 && (offset % interval === 0) && posted < total) {
         const textList = Array.isArray(state.autoCommentSettings.commentsList) && 
                         state.autoCommentSettings.commentsList.length 
@@ -788,7 +811,6 @@
           ? textList[Math.floor(Math.random() * textList.length)]
           : 'Спасибо за главу!';
 
-        // Пауза автопрокрутки на время отправки
         const wasAutoScrolling = state.autoScroll;
         
         try {
@@ -801,7 +823,6 @@
           logger.warn('Ошибка паузы автопрокрутки:', err);
         }
 
-        // Отправка комментария
         let success = false;
         try {
           const promise = postComment(text);
@@ -812,7 +833,6 @@
           logger.error('Ошибка вызова postComment:', err);
         }
 
-        // Возобновление автопрокрутки
         try {
           if (wasAutoScrolling) {
             await chromeAsync.storage.set({ autoScroll: true });
@@ -823,7 +843,6 @@
           logger.warn('Ошибка возобновления автопрокрутки:', err);
         }
 
-        // Обновление счетчика
         if (success) {
           state.autoCommentState.posted = posted + 1;
           await chromeAsync.storage.set({
@@ -842,17 +861,15 @@
    * Синхронизирует все активные функции
    */
   function syncAllFeatures() {
-    // Автопрокрутка (только на страницах глав)
     if (state.autoScroll && isChapterPage() && !state.isPerformingClick) {
       startSmoothScroll();
     } else {
       stopSmoothScroll();
     }
 
-    // ИСПРАВЛЕНО: Фарм подарков теперь работает только на страницах глав
     if (state.farmActive && isChapterPage() && !state.farmInterval) {
       state.farmInterval = setInterval(farmOnce, CONFIG.FARM_INTERVAL);
-      logger.info('✅ Фарм ивента запущен (только на страницах глав)');
+      logger.info('✅ Фарм ивента запущен');
     }
     if ((!state.farmActive || !isChapterPage()) && state.farmInterval) {
       clearInterval(state.farmInterval);
@@ -860,7 +877,6 @@
       logger.info('⏸️ Фарм ивента остановлен');
     }
 
-    // Фарм шахты (только на страницах шахты)
     if (state.mineActive && isMinePage() && !state.mineInterval) {
       state.mineInterval = setInterval(
         mineTick, 
@@ -875,9 +891,6 @@
 
   // ==================== ОБРАБОТЧИКИ СООБЩЕНИЙ ====================
   
-  /**
-   * Обрабатывает сообщения от background script
-   */
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     (async () => {
       if (!msg?.action) {
@@ -940,7 +953,6 @@
           }
 
           case 'startFarm': {
-            // НОВАЯ ПРОВЕРКА: Фарм работает только на страницах глав
             if (!isChapterPage()) {
               sendResponse({ 
                 success: false, 
@@ -1025,14 +1037,11 @@
       }
     })();
 
-    return true; // Асинхронный ответ
+    return true;
   });
 
   // ==================== ОБРАБОТЧИКИ ИЗМЕНЕНИЙ ХРАНИЛИЩА ====================
   
-  /**
-   * Реагирует на изменения в chrome.storage
-   */
   chrome.storage.onChanged.addListener((changes) => {
     const relevantKeys = STORAGE_KEYS;
     const hasRelevantChanges = Object.keys(changes).some(key => 
@@ -1043,7 +1052,6 @@
       loadStateFromStorage();
     }
 
-    // Обработка изменения счетчика глав
     if (changes.chapterRead) {
       const newValue = changes.chapterRead.newValue;
       if (typeof newValue === 'number') {
@@ -1051,7 +1059,6 @@
       }
     }
 
-    // Обновление настроек автокомментирования
     if (changes[CONFIG.AUTO_COMMENT_KEY]) {
       Object.assign(
         state.autoCommentSettings, 
@@ -1069,9 +1076,6 @@
 
   // ==================== ИНИЦИАЛИЗАЦИЯ ====================
   
-  /**
-   * Инициализация при загрузке страницы
-   */
   window.addEventListener('load', () => {
     loadStateFromStorage(async () => {
       if (state.autoScroll && isChapterPage()) {
@@ -1090,14 +1094,12 @@
         const updates = {};
         let newRead = storedRead;
 
-        // Инкремент счетчика при новой главе
         if (currentChapterUrl !== location.href) {
           newRead = (typeof storedRead === 'number' ? storedRead : 0) + 1;
           updates.chapterRead = newRead;
           updates.currentChapterUrl = location.href;
         }
 
-        // Проверка лимита глав
         if (storedLimit > 0 && newRead > storedLimit) {
           state.autoScroll = false;
           updates.autoScroll = false;
@@ -1116,9 +1118,9 @@
     });
   });
 
-  // Начальная загрузка состояния
   loadStateFromStorage();
 
-  logger.info('✅ Content script загружен');
-  logger.info('📌 Фарм ивента теперь работает ТОЛЬКО на страницах глав');
+  logger.info('✅ Content script загружен (v4.2 - улучшенная версия)');
+  logger.info('🚀 Плавная прокрутка без рывков');
+  logger.info('💬 Автозакрытие окна комментариев');
 })();
