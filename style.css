@@ -116,12 +116,13 @@ body {
   display: flex;
   gap: var(--spacing-md);
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .status-item {
   display: flex;
   align-items: center;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   gap: var(--spacing-sm);
   color: var(--text-color);
@@ -384,6 +385,26 @@ body {
 .section input[type="text"]:focus {
   outline: 2px solid #2196f3;
   outline-offset: 1px;
+}
+
+/* ==================== ГРУППА КОНТРОЛЯ СКОРОСТИ ==================== */
+
+.speed-control-group {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+  margin-top: 6px;
+}
+
+.speed-control-group input[type="range"] {
+  flex: 1;
+  margin: 0;
+}
+
+.speed-control-group input[type="number"] {
+  width: 80px;
+  margin: 0;
+  flex-shrink: 0;
 }
 
 /* ==================== КНОПКИ ==================== */

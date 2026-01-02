@@ -21,7 +21,9 @@ const CONFIG = {
     MIN_GIFT_DELAY: 50,
     MAX_GIFT_DELAY: 2000,
     MIN_MINE_DELAY: 0.2,
-    MAX_MINE_DELAY: 5.0
+    MAX_MINE_DELAY: 5.0,
+    MIN_SCROLL_SPEED: 10,
+    MAX_SCROLL_SPEED: 2000
   },
   
   // Таймауты
@@ -341,28 +343,30 @@ class CommentsManager {
    */
   static async save() {
     try {
-      const enableCheckbox = $('#autoCommentEnable');
+      const data = await chromeAsync.storage.get([CONFIG.STORAGE_KEYS.AUTO_COMMENT]);
+      const settings = Object.assign(
+        { ...CONFIG.DEFAULTS }, 
+        data[CONFIG.STORAGE_KEYS.AUTO_COMMENT] || {}
+      );
+
       const intervalInput = $('#commentInterval');
       const totalInput = $('#commentTotal');
       
-      const settings = {
-        enabled: enableCheckbox ? enableCheckbox.checked : false,
-        interval: clamp(
-          safeParseInt(intervalInput?.value, CONFIG.DEFAULTS.INTERVAL),
-          CONFIG.LIMITS.MIN_INTERVAL,
-          CONFIG.LIMITS.MAX_INTERVAL
-        ),
-        totalComments: clamp(
-          safeParseInt(totalInput?.value, CONFIG.DEFAULTS.TOTAL_COMMENTS),
-          CONFIG.LIMITS.MIN_TOTAL_COMMENTS,
-          CONFIG.LIMITS.MAX_TOTAL_COMMENTS
-        ),
-        commentsList: []
-      };
+      settings.interval = clamp(
+        safeParseInt(intervalInput?.value, CONFIG.DEFAULTS.INTERVAL),
+        CONFIG.LIMITS.MIN_INTERVAL,
+        CONFIG.LIMITS.MAX_INTERVAL
+      );
+      settings.totalComments = clamp(
+        safeParseInt(totalInput?.value, CONFIG.DEFAULTS.TOTAL_COMMENTS),
+        CONFIG.LIMITS.MIN_TOTAL_COMMENTS,
+        CONFIG.LIMITS.MAX_TOTAL_COMMENTS
+      );
 
       // Собираем комментарии из UI
       const commentsCloud = $('#commentsCloud');
       if (commentsCloud) {
+        settings.commentsList = [];
         commentsCloud.querySelectorAll('.comment-text')
           .forEach(el => settings.commentsList.push(el.textContent));
       }
@@ -394,6 +398,56 @@ class CommentsManager {
     } catch (err) {
       console.error('Ошибка очистки:', err);
       UIManager.showError('Ошибка очистки');
+    }
+  }
+
+  /**
+   * Включает комментирование
+   */
+  static async enable() {
+    try {
+      const data = await chromeAsync.storage.get([CONFIG.STORAGE_KEYS.AUTO_COMMENT]);
+      const settings = Object.assign(
+        { ...CONFIG.DEFAULTS }, 
+        data[CONFIG.STORAGE_KEYS.AUTO_COMMENT] || {}
+      );
+      
+      settings.enabled = true;
+      
+      await chromeAsync.storage.set({ 
+        [CONFIG.STORAGE_KEYS.AUTO_COMMENT]: settings 
+      });
+      
+      StatusManager.sync();
+      UIManager.showError('Комментирование включено');
+    } catch (err) {
+      console.error('Ошибка включения комментирования:', err);
+      UIManager.showError('Ошибка');
+    }
+  }
+
+  /**
+   * Выключает комментирование
+   */
+  static async disable() {
+    try {
+      const data = await chromeAsync.storage.get([CONFIG.STORAGE_KEYS.AUTO_COMMENT]);
+      const settings = Object.assign(
+        { ...CONFIG.DEFAULTS }, 
+        data[CONFIG.STORAGE_KEYS.AUTO_COMMENT] || {}
+      );
+      
+      settings.enabled = false;
+      
+      await chromeAsync.storage.set({ 
+        [CONFIG.STORAGE_KEYS.AUTO_COMMENT]: settings 
+      });
+      
+      StatusManager.sync();
+      UIManager.showError('Комментирование выключено');
+    } catch (err) {
+      console.error('Ошибка выключения комментирования:', err);
+      UIManager.showError('Ошибка');
     }
   }
 }
@@ -443,6 +497,10 @@ class StatusManager {
     const auto = Boolean(data.autoScroll);
     const farm = Boolean(data.farmActive);
     const mine = Boolean(data.mineActive);
+    
+    // Добавляем индикатор для комментирования
+    const commentSettings = data[CONFIG.STORAGE_KEYS.AUTO_COMMENT] || {};
+    const comment = Boolean(commentSettings.enabled);
 
     this._setIndicator('autoStatus', auto, 
       'Автопрокрутка включена', 'Автопрокрутка выключена');
@@ -450,6 +508,8 @@ class StatusManager {
       'Фарм активен', 'Фарм не активен');
     this._setIndicator('mineStatus', mine, 
       'Шахта активна', 'Шахта не активна');
+    this._setIndicator('commentStatus', comment, 
+      'Комментирование включено', 'Комментирование выключено');
   }
 
   /**
@@ -470,11 +530,19 @@ class StatusManager {
     const autoSwitch = $('#autoScrollSwitch');
     if (autoSwitch) autoSwitch.checked = Boolean(data.autoScroll);
     
-    const speed = safeParseInt(data.scrollSpeed, 50);
+    const speed = clamp(
+      safeParseInt(data.scrollSpeed, 50),
+      CONFIG.LIMITS.MIN_SCROLL_SPEED,
+      CONFIG.LIMITS.MAX_SCROLL_SPEED
+    );
+    
     const speedRange = $('#scrollSpeedRange');
     const speedLabel = $('#scrollSpeedLabel');
+    const speedInput = $('#scrollSpeedInput');
+    
     if (speedRange) speedRange.value = speed;
     if (speedLabel) speedLabel.textContent = speed;
+    if (speedInput) speedInput.value = speed;
     
     const chapterLimit = safeParseInt(data.chapterLimit, 0);
     const limitInput = $('#chapterLimitInput');
@@ -521,13 +589,18 @@ class StatusManager {
   static _updateCommentControls(data) {
     const settings = data[CONFIG.STORAGE_KEYS.AUTO_COMMENT] || { ...CONFIG.DEFAULTS };
     
-    const enableCheckbox = $('#autoCommentEnable');
     const intervalInput = $('#commentInterval');
     const totalInput = $('#commentTotal');
+    const startBtn = $('#startComment');
+    const stopBtn = $('#stopComment');
     
-    if (enableCheckbox) enableCheckbox.checked = Boolean(settings.enabled);
     if (intervalInput) intervalInput.value = settings.interval || CONFIG.DEFAULTS.INTERVAL;
     if (totalInput) totalInput.value = settings.totalComments || CONFIG.DEFAULTS.TOTAL_COMMENTS;
+    
+    // Управление кнопками
+    const isEnabled = Boolean(settings.enabled);
+    if (startBtn) startBtn.disabled = isEnabled;
+    if (stopBtn) stopBtn.disabled = !isEnabled;
     
     CommentsManager.render(settings.commentsList || []);
   }
@@ -671,6 +744,7 @@ class EventHandlers {
   static _initScroll() {
     const autoSwitch = $('#autoScrollSwitch');
     const speedRange = $('#scrollSpeedRange');
+    const speedInput = $('#scrollSpeedInput');
     const limitInput = $('#chapterLimitInput');
     const resetBtn = $('#resetChapters');
     
@@ -698,22 +772,72 @@ class EventHandlers {
     }
 
     // Слайдер скорости (с debounce)
+    let speedDebounce;
+    
     if (speedRange) {
-      let speedDebounce;
       speedRange.addEventListener('input', (e) => {
+        const value = clamp(
+          safeParseInt(e.target.value, 50),
+          CONFIG.LIMITS.MIN_SCROLL_SPEED,
+          CONFIG.LIMITS.MAX_SCROLL_SPEED
+        );
+        
         const label = $('#scrollSpeedLabel');
-        if (label) label.textContent = e.target.value;
+        const input = $('#scrollSpeedInput');
+        
+        if (label) label.textContent = value;
+        if (input) input.value = value;
         
         clearTimeout(speedDebounce);
         speedDebounce = setTimeout(async () => {
           try {
-            const speed = safeParseInt(e.target.value, 50);
-            await chromeAsync.storage.set({ scrollSpeed: speed });
-            await ActionManager.sendAction('updateSpeed', { speed });
+            await chromeAsync.storage.set({ scrollSpeed: value });
+            await ActionManager.sendAction('updateSpeed', { speed: value });
           } catch (err) {
             console.error('Ошибка обновления скорости:', err);
           }
         }, CONFIG.TIMEOUTS.SPEED_DEBOUNCE);
+      });
+    }
+
+    // Числовое поле скорости
+    if (speedInput) {
+      speedInput.addEventListener('change', async (e) => {
+        try {
+          const value = clamp(
+            safeParseInt(e.target.value, 50),
+            CONFIG.LIMITS.MIN_SCROLL_SPEED,
+            CONFIG.LIMITS.MAX_SCROLL_SPEED
+          );
+          
+          const range = $('#scrollSpeedRange');
+          const label = $('#scrollSpeedLabel');
+          
+          e.target.value = value;
+          if (range) range.value = value;
+          if (label) label.textContent = value;
+          
+          await chromeAsync.storage.set({ scrollSpeed: value });
+          await ActionManager.sendAction('updateSpeed', { speed: value });
+          StatusManager.sync();
+        } catch (err) {
+          console.error('Ошибка обновления скорости:', err);
+        }
+      });
+
+      // Обновление при вводе (для мгновенной обратной связи)
+      speedInput.addEventListener('input', (e) => {
+        const value = clamp(
+          safeParseInt(e.target.value, 50),
+          CONFIG.LIMITS.MIN_SCROLL_SPEED,
+          CONFIG.LIMITS.MAX_SCROLL_SPEED
+        );
+        
+        const range = $('#scrollSpeedRange');
+        const label = $('#scrollSpeedLabel');
+        
+        if (range) range.value = value;
+        if (label) label.textContent = value;
       });
     }
 
@@ -922,38 +1046,23 @@ class EventHandlers {
   }
 
   /**
-   * Автокомментирование
+   * Автокомментирование - ОБНОВЛЕНО: кнопки вкл/выкл
    */
   static _initComments() {
-    const enableCheckbox = $('#autoCommentEnable');
+    const startBtn = $('#startComment');
+    const stopBtn = $('#stopComment');
     const addBtn = $('#addCommentBtn');
     const saveBtn = $('#saveCommentsBtn');
     const clearBtn = $('#clearCommentsBtn');
     const newText = $('#newCommentText');
     
-    // Переключатель (немедленное сохранение)
-    if (enableCheckbox) {
-      enableCheckbox.addEventListener('change', async (e) => {
-        try {
-          const enabled = e.target.checked;
-          const data = await chromeAsync.storage.get([CONFIG.STORAGE_KEYS.AUTO_COMMENT]);
-          
-          const settings = Object.assign(
-            { ...CONFIG.DEFAULTS }, 
-            data[CONFIG.STORAGE_KEYS.AUTO_COMMENT] || {}
-          );
-          
-          settings.enabled = enabled;
-          
-          await chromeAsync.storage.set({ 
-            [CONFIG.STORAGE_KEYS.AUTO_COMMENT]: settings 
-          });
-          
-          StatusManager.sync();
-        } catch (err) {
-          console.error('Ошибка переключения комментирования:', err);
-        }
-      });
+    // Кнопки включения/выключения
+    if (startBtn) {
+      startBtn.onclick = () => CommentsManager.enable();
+    }
+
+    if (stopBtn) {
+      stopBtn.onclick = () => CommentsManager.disable();
     }
 
     // Добавление комментария
@@ -984,7 +1093,7 @@ class EventHandlers {
   }
 
   /**
-   * Квиз - ИСПРАВЛЕНО: убрана отправка сообщения в background
+   * Квиз
    */
   static _initQuiz() {
     const quizToggle = $('#quizHighlightToggle');

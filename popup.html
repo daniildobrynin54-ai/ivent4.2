@@ -18,6 +18,9 @@
         <div class="status-item">
           <span id="mineStatus" class="status-indicator"></span> <span>Шахта</span>
         </div>
+        <div class="status-item">
+          <span id="commentStatus" class="status-indicator"></span> <span>Комменты</span>
+        </div>
       </div>
     </div>
     <div id="themeToggleContainer">
@@ -47,7 +50,10 @@
       </label>
     </div>
     <label>Скорость автопрокрутки: <span id="scrollSpeedLabel">50</span> px/с</label>
-    <input type="range" id="scrollSpeedRange" min="10" max="2000" step="10">
+    <div class="speed-control-group">
+      <input type="range" id="scrollSpeedRange" min="10" max="2000" step="10">
+      <input type="number" id="scrollSpeedInput" min="10" max="2000" step="10" value="50">
+    </div>
     <label>Сколько глав читать (0=беск.):</label>
     <input type="number" id="chapterLimitInput" min="0" max="10000" step="1" value="0">
     <button id="resetChapters">Сбросить (и остановить прокрутку)</button>
@@ -99,7 +105,11 @@
     <button class="back-button" id="backComment">← Назад</button>
     <h2>Комментирование при чтении</h2>
     <div class="section-group">
-      <label><input type="checkbox" id="autoCommentEnable"> Включить комментирование при чтении</label>
+      <label>Комментирование при чтении:</label>
+      <div style="display:flex; gap:7px;">
+        <button id="startComment">Включить</button>
+        <button id="stopComment">Выключить</button>
+      </div>
     </div>
     <div class="section-group">
       <label>Раз в сколько глав (1-100):</label>
@@ -118,7 +128,7 @@
       <h3 class="card-title">Список комментариев (рандомный выбор)</h3>
       <div id="commentsCloud" style="max-height:160px; overflow:auto; padding:6px; border:1px solid #ddd; background:var(--container-bg)"></div>
       <div style="margin-top:8px; display:flex; gap:8px;">
-        <button id="saveCommentsBtn">Сохранить</button>
+        <button id="saveCommentsBtn">Сохранить настройки</button>
         <button id="clearCommentsBtn">Очистить список</button>
       </div>
       <div style="margin-top:8px;" class="small">Если прочитано недостаточно глав для оставки всех комментариев, при запуске будет показано предупреждение.</div>

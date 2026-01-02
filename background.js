@@ -47,12 +47,12 @@ const chromeAsync = {
 };
 
 /**
- * Логгер для отладки
+ * Логгер для отладки - ИСПРАВЛЕНО
  */
 const logger = {
-  info: (...args) => console.log('[MBH][bg]', ...args),
-  warn: (...args) => console.warn('[MBH][bg]', ...args),
-  error: (...args) => console.error('[MBH][bg]', ...args)
+  info: function(...args) { console.log('[MBH][bg]', ...args); },
+  warn: function(...args) { console.warn('[MBH][bg]', ...args); },
+  error: function(...args) { console.error('[MBH][bg]', ...args); }
 };
 
 /**
