@@ -217,7 +217,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
       giftClickDelay: 600,
       mineClickDelay: 2000,
       theme: 'light',
-      quizHighlight: true,
+      quizHighlight: false,
       autoCommentSettings: {
         enabled: false,
         interval: 2,

@@ -201,6 +201,7 @@ class UIManager {
   static adjustPopupHeight() {
     const body = document.body;
     body.style.height = 'auto';
+    body.style.width = '360px'; // Фиксированная ширина
 
     const activePanel = document.querySelector('.section.active');
     const menu = $('#mainMenu');
@@ -224,7 +225,9 @@ class UIManager {
     height = clamp(height, CONFIG.POPUP_HEIGHT.MIN, CONFIG.POPUP_HEIGHT.MAX);
     
     body.style.height = `${height}px`;
+    body.style.width = '360px'; // Убеждаемся, что ширина остается фиксированной
     document.documentElement.style.height = `${height}px`;
+    document.documentElement.style.width = '360px';
   }
 }
 
@@ -497,6 +500,7 @@ class StatusManager {
     const auto = Boolean(data.autoScroll);
     const farm = Boolean(data.farmActive);
     const mine = Boolean(data.mineActive);
+    const quiz = Boolean(data.quizHighlight);
     
     // Добавляем индикатор для комментирования
     const commentSettings = data[CONFIG.STORAGE_KEYS.AUTO_COMMENT] || {};
@@ -508,6 +512,8 @@ class StatusManager {
       'Фарм активен', 'Фарм не активен');
     this._setIndicator('mineStatus', mine, 
       'Шахта активна', 'Шахта не активна');
+    this._setIndicator('quizStatus', quiz, 
+      'Квиз включен', 'Квиз выключен');
     this._setIndicator('commentStatus', comment, 
       'Комментирование включено', 'Комментирование выключено');
   }
