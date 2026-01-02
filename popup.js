@@ -1,4 +1,4 @@
-// popup.js - Исправленная и оптимизированная версия
+// popup.js - Исправленная версия с увеличенной максимальной скоростью
 'use strict';
 
 /**
@@ -9,7 +9,7 @@
 // ==================== КОНСТАНТЫ ====================
 
 const CONFIG = {
-  // Лимиты
+  // Лимиты (ИЗМЕНЕНО)
   LIMITS: {
     MAX_COMMENTS: 100,
     MIN_INTERVAL: 1,
@@ -23,7 +23,7 @@ const CONFIG = {
     MIN_MINE_DELAY: 0.2,
     MAX_MINE_DELAY: 5.0,
     MIN_SCROLL_SPEED: 10,
-    MAX_SCROLL_SPEED: 2000
+    MAX_SCROLL_SPEED: 5000      // ИЗМЕНЕНО: было 2000
   },
   
   // Таймауты
@@ -48,12 +48,14 @@ const CONFIG = {
     LAST_ERROR: 'lastAutoCommentError'
   },
   
-  // Дефолтные значения
+  // Дефолтные значения (ИЗМЕНЕНО)
   DEFAULTS: {
     ENABLED: false,
     INTERVAL: 2,
     TOTAL_COMMENTS: 5,
-    COMMENTS_LIST: []
+    COMMENTS_LIST: [],
+    GIFT_DELAY: 400,          // ИЗМЕНЕНО: было 600
+    MINE_DELAY: 0.2           // ИЗМЕНЕНО: было 2.0
   }
 };
 
@@ -201,7 +203,7 @@ class UIManager {
   static adjustPopupHeight() {
     const body = document.body;
     body.style.height = 'auto';
-    body.style.width = '360px'; // Фиксированная ширина
+    body.style.width = '360px';
 
     const activePanel = document.querySelector('.section.active');
     const menu = $('#mainMenu');
@@ -225,7 +227,7 @@ class UIManager {
     height = clamp(height, CONFIG.POPUP_HEIGHT.MIN, CONFIG.POPUP_HEIGHT.MAX);
     
     body.style.height = `${height}px`;
-    body.style.width = '360px'; // Убеждаемся, что ширина остается фиксированной
+    body.style.width = '360px';
     document.documentElement.style.height = `${height}px`;
     document.documentElement.style.width = '360px';
   }
@@ -502,7 +504,6 @@ class StatusManager {
     const mine = Boolean(data.mineActive);
     const quiz = Boolean(data.quizHighlight);
     
-    // Добавляем индикатор для комментирования
     const commentSettings = data[CONFIG.STORAGE_KEYS.AUTO_COMMENT] || {};
     const comment = Boolean(commentSettings.enabled);
 
@@ -556,10 +557,10 @@ class StatusManager {
   }
 
   /**
-   * Обновляет контролы фарма
+   * Обновляет контролы фарма (ИЗМЕНЕНО)
    */
   static _updateFarmControls(data) {
-    const giftDelay = safeParseInt(data.giftClickDelay, 600);
+    const giftDelay = safeParseInt(data.giftClickDelay, CONFIG.DEFAULTS.GIFT_DELAY);
     const giftRange = $('#giftDelayRange');
     const giftLabel = $('#giftDelayLabel');
     const giftInput = $('#giftDelayInput');
@@ -573,10 +574,13 @@ class StatusManager {
   }
 
   /**
-   * Обновляет контролы шахты
+   * Обновляет контролы шахты (ИЗМЕНЕНО)
    */
   static _updateMineControls(data) {
-    const mineDelay = safeParseFloat(data.mineClickDelay, 2000) / 1000;
+    const mineDelay = safeParseFloat(
+      data.mineClickDelay, 
+      CONFIG.DEFAULTS.MINE_DELAY * 1000
+    ) / 1000;
     const mineRange = $('#mineDelayRange');
     const mineLabel = $('#mineDelayLabel');
     const mineInput = $('#mineDelayInput');
@@ -603,7 +607,6 @@ class StatusManager {
     if (intervalInput) intervalInput.value = settings.interval || CONFIG.DEFAULTS.INTERVAL;
     if (totalInput) totalInput.value = settings.totalComments || CONFIG.DEFAULTS.TOTAL_COMMENTS;
     
-    // Управление кнопками
     const isEnabled = Boolean(settings.enabled);
     if (startBtn) startBtn.disabled = isEnabled;
     if (stopBtn) stopBtn.disabled = !isEnabled;
@@ -666,7 +669,7 @@ class ActionManager {
       const plannedChapters = safeParseInt(limitInput?.value, 0);
 
       if (!settings.enabled) return true;
-      if (plannedChapters === 0) return true; // Бесконечное чтение
+      if (plannedChapters === 0) return true;
 
       const interval = Math.max(1, safeParseInt(settings.interval, 1));
       const total = Math.max(1, safeParseInt(settings.totalComments, 1));
@@ -684,7 +687,7 @@ class ActionManager {
       return true;
     } catch (err) {
       console.error('Ошибка валидации:', err);
-      return true; // Пропускаем валидацию при ошибке
+      return true;
     }
   }
 }
@@ -754,7 +757,6 @@ class EventHandlers {
     const limitInput = $('#chapterLimitInput');
     const resetBtn = $('#resetChapters');
     
-    // Переключатель автопрокрутки
     if (autoSwitch) {
       autoSwitch.onchange = async (e) => {
         try {
@@ -777,7 +779,6 @@ class EventHandlers {
       };
     }
 
-    // Слайдер скорости (с debounce)
     let speedDebounce;
     
     if (speedRange) {
@@ -806,7 +807,6 @@ class EventHandlers {
       });
     }
 
-    // Числовое поле скорости
     if (speedInput) {
       speedInput.addEventListener('change', async (e) => {
         try {
@@ -831,7 +831,6 @@ class EventHandlers {
         }
       });
 
-      // Обновление при вводе (для мгновенной обратной связи)
       speedInput.addEventListener('input', (e) => {
         const value = clamp(
           safeParseInt(e.target.value, 50),
@@ -847,7 +846,6 @@ class EventHandlers {
       });
     }
 
-    // Лимит глав
     if (limitInput) {
       limitInput.addEventListener('input', async (e) => {
         try {
@@ -865,7 +863,6 @@ class EventHandlers {
       });
     }
 
-    // Сброс
     if (resetBtn) {
       resetBtn.onclick = async () => {
         try {
@@ -894,12 +891,11 @@ class EventHandlers {
     const startBtn = $('#startFarm');
     const stopBtn = $('#stopFarm');
     
-    // Задержка подарков
     let giftDebounce;
     
     if (giftRange) {
       giftRange.addEventListener('input', (e) => {
-        const value = safeParseInt(e.target.value, 600);
+        const value = safeParseInt(e.target.value, CONFIG.DEFAULTS.GIFT_DELAY);
         const label = $('#giftDelayLabel');
         const input = $('#giftDelayInput');
         if (label) label.textContent = value;
@@ -921,7 +917,7 @@ class EventHandlers {
       giftInput.addEventListener('change', async (e) => {
         try {
           const value = clamp(
-            safeParseInt(e.target.value, 600),
+            safeParseInt(e.target.value, CONFIG.DEFAULTS.GIFT_DELAY),
             CONFIG.LIMITS.MIN_GIFT_DELAY,
             CONFIG.LIMITS.MAX_GIFT_DELAY
           );
@@ -941,7 +937,6 @@ class EventHandlers {
       });
     }
 
-    // Кнопки фарма
     if (startBtn) {
       startBtn.onclick = async () => {
         try {
@@ -977,12 +972,11 @@ class EventHandlers {
     const startBtn = $('#startMine');
     const stopBtn = $('#stopMine');
     
-    // Скорость клика шахты
     let mineDebounce;
     
     if (mineRange) {
       mineRange.addEventListener('input', (e) => {
-        const value = safeParseFloat(e.target.value, 2.0);
+        const value = safeParseFloat(e.target.value, CONFIG.DEFAULTS.MINE_DELAY);
         const label = $('#mineDelayLabel');
         const input = $('#mineDelayInput');
         if (label) label.textContent = value.toFixed(1);
@@ -1004,7 +998,7 @@ class EventHandlers {
       mineInput.addEventListener('change', async (e) => {
         try {
           const value = clamp(
-            safeParseFloat(e.target.value, 2.0),
+            safeParseFloat(e.target.value, CONFIG.DEFAULTS.MINE_DELAY),
             CONFIG.LIMITS.MIN_MINE_DELAY,
             CONFIG.LIMITS.MAX_MINE_DELAY
           );
@@ -1024,7 +1018,6 @@ class EventHandlers {
       });
     }
 
-    // Кнопки шахты
     if (startBtn) {
       startBtn.onclick = async () => {
         try {
@@ -1052,7 +1045,7 @@ class EventHandlers {
   }
 
   /**
-   * Автокомментирование - ОБНОВЛЕНО: кнопки вкл/выкл
+   * Автокомментирование
    */
   static _initComments() {
     const startBtn = $('#startComment');
@@ -1062,7 +1055,6 @@ class EventHandlers {
     const clearBtn = $('#clearCommentsBtn');
     const newText = $('#newCommentText');
     
-    // Кнопки включения/выключения
     if (startBtn) {
       startBtn.onclick = () => CommentsManager.enable();
     }
@@ -1071,14 +1063,12 @@ class EventHandlers {
       stopBtn.onclick = () => CommentsManager.disable();
     }
 
-    // Добавление комментария
     if (addBtn) {
       addBtn.onclick = () => {
         if (newText) CommentsManager.add(newText.value);
       };
     }
 
-    // Enter для добавления
     if (newText) {
       newText.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
@@ -1087,12 +1077,10 @@ class EventHandlers {
       });
     }
 
-    // Сохранение настроек
     if (saveBtn) {
       saveBtn.onclick = () => CommentsManager.save();
     }
 
-    // Очистка
     if (clearBtn) {
       clearBtn.onclick = () => CommentsManager.clear();
     }
@@ -1109,7 +1097,6 @@ class EventHandlers {
       try {
         const enabled = e.target.checked;
         
-        // Просто сохраняем в storage - qh_content.js слушает изменения
         await chromeAsync.storage.set({ quizHighlight: enabled });
         
         StatusManager.sync();
@@ -1124,7 +1111,6 @@ class EventHandlers {
    * Изменение размера окна
    */
   static _initResize() {
-    // Автоподстройка высоты при анимациях
     document.body.addEventListener('transitionend', () => 
       UIManager.adjustPopupHeight()
     );
@@ -1139,7 +1125,6 @@ class EventHandlers {
       UIManager.adjustPopupHeight()
     );
 
-    // Слушатель изменений хранилища
     chrome.storage.onChanged.addListener(() => StatusManager.sync());
   }
 }
@@ -1148,7 +1133,6 @@ class EventHandlers {
 
 document.addEventListener('DOMContentLoaded', () => {
   try {
-    // Небольшая задержка для корректной инициализации
     setTimeout(() => {
       EventHandlers.init();
       StatusManager.sync();

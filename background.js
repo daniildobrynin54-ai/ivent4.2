@@ -206,7 +206,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   if (details.reason === 'install') {
     logger.info('🎉 Расширение установлено');
     
-    // Устанавливаем дефолтные настройки
+    // Устанавливаем дефолтные настройки (ИЗМЕНЕНО)
     await chromeAsync.storage.set({
       autoScroll: false,
       scrollSpeed: 50,
@@ -214,8 +214,8 @@ chrome.runtime.onInstalled.addListener(async (details) => {
       chapterRead: 0,
       farmActive: false,
       mineActive: false,
-      giftClickDelay: 600,
-      mineClickDelay: 2000,
+      giftClickDelay: 400,      // ИЗМЕНЕНО: было 600
+      mineClickDelay: 200,       // ИЗМЕНЕНО: было 2000
       theme: 'light',
       quizHighlight: false,
       autoCommentSettings: {
